@@ -2,18 +2,12 @@
 import base64
 import re
 import zlib
-from collections import namedtuple
 
 from . import exceptions
 from .snippets import findall_regex, split_by_regex
 
-header = namedtuple(
-    "header",
-    "index_path old_path old_version new_path new_version",
-)
+from .model import Change, Header, Diff
 
-diffobj = namedtuple("diff", "header changes text")
-Change = namedtuple("Change", "old new line hunk")
 
 file_timestamp_str = "(.+?)(?:\t|:|  +)(.*)"
 # .+? was previously [^:\t\n\r\f\v]+
@@ -101,7 +95,7 @@ def parse_patch(text):
         h = parse_header(diff)
         d = parse_diff(diff)
         if h or d:
-            yield diffobj(header=h, changes=d, text=difftext)
+            yield Diff(header=h, changes=d, text=difftext)
 
 
 def parse_header(text):
@@ -139,7 +133,7 @@ def parse_scm_header(text):
                     if new_path.startswith("b/"):
                         new_path = new_path[2:]
 
-                    return header(
+                    return Header(
                         index_path=res.index_path,
                         old_path=old_path,
                         old_version=res.old_version,
@@ -245,7 +239,7 @@ def parse_git_header(text):
 
             if new_path.startswith("b/"):
                 new_path = new_path[2:]
-            return header(
+            return Header(
                 index_path=None,
                 old_path=old_path,
                 old_version=old_version,
@@ -262,7 +256,7 @@ def parse_git_header(text):
         if cmd_new_path.startswith("b/"):
             cmd_new_path = cmd_new_path[2:]
 
-        return header(
+        return Header(
             index_path=None,
             # wow, I kind of hate this:
             # assume /dev/null if the versions are zeroed out
@@ -293,7 +287,7 @@ def parse_svn_header(text):
 
         diff_header = parse_diff_header(lines)
         if not diff_header:
-            return header(
+            return Header(
                 index_path=i.group(1),
                 old_path=i.group(1),
                 old_version=None,
@@ -335,7 +329,7 @@ def parse_svn_header(text):
         if type(nver) != int:
             nver = None
 
-        return header(
+        return Header(
             index_path=i.group(1),
             old_path=opath,
             old_version=over,
@@ -383,14 +377,14 @@ def parse_cvs_header(text):
                     elif nend_c:
                         nver = nend_c.group(1)
 
-                return header(
+                return Header(
                     index_path=i.group(1),
                     old_path=diff_header.old_path,
                     old_version=over,
                     new_path=diff_header.new_path,
                     new_version=nver,
                 )
-            return header(
+            return Header(
                 index_path=i.group(1),
                 old_path=i.group(1),
                 old_version=None,
@@ -407,7 +401,7 @@ def parse_cvs_header(text):
 
             d = old_cvs_diffcmd_header.match(lines[0])
             if not d:
-                return header(
+                return Header(
                     index_path=i.group(1),
                     old_path=i.group(1),
                     old_version=None,
@@ -419,7 +413,7 @@ def parse_cvs_header(text):
             parse_diff_header(lines)
             over = d.group(2) if d.group(2) else None
             nver = d.group(4) if d.group(4) else None
-            return header(
+            return Header(
                 index_path=i.group(1),
                 old_path=d.group(1),
                 old_version=over,
@@ -444,7 +438,7 @@ def parse_diffcmd_header(text):
         d = diffcmd_header.match(lines[0])
         del lines[0]
         if d:
-            return header(
+            return Header(
                 index_path=None,
                 old_path=d.group(1),
                 old_version=None,
@@ -479,7 +473,7 @@ def parse_unified_header(text):
                 if len(nver) == 0:
                     nver = None
 
-                return header(
+                return Header(
                     index_path=None,
                     old_path=o.group(1),
                     old_version=over,
@@ -515,7 +509,7 @@ def parse_context_header(text):
                 if len(nver) == 0:
                     nver = None
 
-                return header(
+                return Header(
                     index_path=None,
                     old_path=o.group(1),
                     old_version=over,
@@ -570,10 +564,26 @@ def parse_default_diff(text):
                 line = c.group(2)
 
                 if kind == "<" and (r != old_len or r == 0):
-                    changes.append(Change(old + r, None, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=old + r,
+                            new=None,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     r += 1
                 elif kind == ">" and (i != new_len or i == 0):
-                    changes.append(Change(None, new + i, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=None,
+                            new=new + i,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
+
+
                     i += 1
 
     if len(changes) > 0:
@@ -628,14 +638,35 @@ def parse_unified_diff(text):
                 line = c.group(2)
 
                 if kind == "-" and (r != old_len or r == 0):
-                    changes.append(Change(old + r, None, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=old + r,
+                            new=None,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     r += 1
                 elif kind == "+" and (i != new_len or i == 0):
-                    changes.append(Change(None, new + i, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=None,
+                            new=new + i,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     i += 1
                 elif kind == " ":
                     if r != old_len and i != new_len:
-                        changes.append(Change(old + r, new + i, line, hunk_n))
+                        changes.append(
+                            Change(
+                                old=old + r,
+                                new=new + i,
+                                line=line,
+                                hunk=hunk_n,
+                            )
+                        )
                     r += 1
                     i += 1
 
@@ -708,12 +739,26 @@ def parse_context_diff(text):
                 line = c.group(2)
 
                 if kind == "-" and (j != old_len or j == 0):
-                    changes.append(Change(old + j, None, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=old + j,
+                            new=None,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     j += 1
                 elif kind == " " and (
                     (j != old_len and k != new_len) or (j == 0 or k == 0)
                 ):
-                    changes.append(Change(old + j, new + k, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=old + j,
+                            new=new + k,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     j += 1
                     k += 1
                 elif kind == "+" or kind == "!":
@@ -735,12 +780,26 @@ def parse_context_diff(text):
                 line = c.group(2)
 
                 if kind == "+" and (k != new_len or k == 0):
-                    changes.append(Change(None, new + k, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=None,
+                            new=new + k,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     k += 1
                 elif kind == " " and (
                     (j != old_len and k != new_len) or (j == 0 or k == 0)
                 ):
-                    changes.append(Change(old + j, new + k, line, hunk_n))
+                    changes.append(
+                        Change(
+                            old=old + j,
+                            new=new + k,
+                            line=line,
+                            hunk=hunk_n,
+                        )
+                    )
                     j += 1
                     k += 1
                 elif kind == "-" or kind == "!":
@@ -766,17 +825,38 @@ def parse_context_diff(text):
                 del old_hunk[0]
                 del new_hunk[0]
             elif okind == " " and nkind == " " and oline == nline:
-                changes.append(Change(old + j, new + k, oline, hunk_n))
+                changes.append(
+                    Change(
+                        old=old + j,
+                        new=new + k,
+                        line=oline,
+                        hunk=hunk_n,
+                    )
+                )
                 j += 1
                 k += 1
                 del old_hunk[0]
                 del new_hunk[0]
             elif okind == "-" or okind == "!" and (j != old_len or j == 0):
-                changes.append(Change(old + j, None, oline, hunk_n))
+                changes.append(
+                    Change(
+                        old=old + j,
+                        new=None,
+                        line=oline,
+                        hunk=hunk_n,
+                    )
+                )
                 j += 1
                 del old_hunk[0]
             elif nkind == "+" or nkind == "!" and (k != new_len or k == 0):
-                changes.append(Change(None, new + k, nline, hunk_n))
+                changes.append(
+                    Change(
+                        old=None,
+                        new=new + k,
+                        line=nline,
+                        hunk=hunk_n,
+                    )
+                )
                 k += 1
                 del new_hunk[0]
             else:
@@ -824,7 +904,15 @@ def parse_ed_diff(text):
             if hunk_kind == "d":
                 k = 0
                 while old_end >= old:
-                    changes.append(Change(old + k, None, None, hunk_n))
+                    # changes.append(Change(old + k, None, None, hunk_n))
+                    changes.append(
+                        Change(
+                            old = old + k,
+                            new = None,
+                            line = None,
+                            hunk = hunk_n,
+                        )
+                    )
                     r += 1
                     k += 1
                     old_end -= 1
@@ -835,7 +923,14 @@ def parse_ed_diff(text):
                 if not e and hunk_kind == "c":
                     k = 0
                     while old_end >= old:
-                        changes.append(Change(old + k, None, None, hunk_n))
+                        changes.append(
+                            Change(
+                                old = old + k,
+                                new = None,
+                                line = None,
+                                hunk = hunk_n,
+                            )
+                        )
                         r += 1
                         k += 1
                         old_end -= 1
@@ -844,10 +939,10 @@ def parse_ed_diff(text):
                     # for these tests.
                     changes.append(
                         Change(
-                            None,
-                            old - r + i + k + j,
-                            hunk[0],
-                            hunk_n,
+                            old = None,
+                            new = old - r + i + k + j,
+                            line = hunk[0],
+                            hunk = hunk_n,
                         )
                     )
                     i += 1
@@ -855,10 +950,10 @@ def parse_ed_diff(text):
                 if not e and hunk_kind == "a":
                     changes.append(
                         Change(
-                            None,
-                            old - r + i + 1,
-                            hunk[0],
-                            hunk_n,
+                            old = None,
+                            new = old - r + i + 1,
+                            line = hunk[0],
+                            hunk = hunk_n,
                         )
                     )
                     i += 1
@@ -904,7 +999,14 @@ def parse_rcs_ed_diff(text):
                     old += total_change_size + 1
                     total_change_size += size
                     while size > 0 and len(hunk) > 0:
-                        changes.append(Change(None, old + j, hunk[0], hunk_n))
+                        changes.append(
+                            Change(
+                                old = None,
+                                new = old + j,
+                                line = hunk[0],
+                                hunk = hunk_n,
+                            )
+                        )
                         j += 1
                         size -= 1
 
@@ -913,7 +1015,14 @@ def parse_rcs_ed_diff(text):
                 elif hunk_kind == "d":
                     total_change_size -= size
                     while size > 0:
-                        changes.append(Change(old + j, None, None, hunk_n))
+                        changes.append(
+                            Change(
+                                old = old + j,
+                                new = None,
+                                line = None,
+                                hunk = hunk_n,
+                            )
+                        )
                         j += 1
                         size -= 1
 
@@ -974,8 +1083,14 @@ def parse_git_binary_diff(text):
                 decoded = base64.b85decode(new_encoded)
                 added_data = zlib.decompress(decoded)
                 assert new_size == len(added_data)
-                change = Change(None, 0, added_data, None)
-                changes.append(change)
+                changes.append(
+                    Change(
+                        old = None,
+                        new = 0,
+                        line = added_data,
+                        hunk = None,
+                    )
+                )
                 new_size = 0
             else:
                 break
@@ -998,8 +1113,14 @@ def parse_git_binary_diff(text):
                 decoded = base64.b85decode(old_encoded)
                 removed_data = zlib.decompress(decoded)
                 assert old_size == len(removed_data)
-                change = Change(0, None, None, removed_data)
-                changes.append(change)
+                changes.append(
+                    Change(
+                        old = 0,
+                        new = None,
+                        line = None,
+                        hunk = removed_data,
+                    )
+                )
                 old_size = 0
             else:
                 break

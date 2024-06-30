@@ -1,7 +1,7 @@
 [project]
-name = "whatthepatch"
-version = "1.0.5"
-maintainers = [{ name = "Christopher S. Corley", email = "cscorley@gmail.com" }]
+name = "whatthepatch-pydantic"
+version = "1.0.6a1"
+maintainers = [{ name = "Christopher S. Corley", email = "cscorley@gmail.com" }, { name = "jingfelix", email = "jingfelix@outlook.com" }]
 requires-python = ">=3.7"
 readme = "README.rst"
 description = "A patch parsing and application library."
@@ -27,8 +27,8 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/cscorley/whatthepatch"
-"Bug Tracker" = "https://github.com/cscorley/whatthepatch/issues"
+"Homepage" = "https://github.com/jingfelix/whatthepatch"
+"Bug Tracker" = "https://github.com/jingfelix/whatthepatch/issues"
 
 [build-system]
 requires = ["setuptools>=65.0.0"]

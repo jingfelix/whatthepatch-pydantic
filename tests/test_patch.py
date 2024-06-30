@@ -5,8 +5,8 @@ import time
 import unittest
 
 from src import whatthepatch as wtp
-from src.whatthepatch.patch import Change, diffobj
-from src.whatthepatch.patch import header as headerobj
+from src.whatthepatch.patch import Change, Diff as diffobj
+from src.whatthepatch.patch import Header as headerobj
 
 module_path = os.path.dirname(__file__)
 

@@ -8,6 +8,10 @@ pytest = "*"
 flake8 = "*"
 black = "*"
 build = "*"
+whatthepatch-pydantic = {file = ".", editable = true}
 
 [pipenv]
 allow_prereleases = true
+
+[packages]
+pydantic = "*"

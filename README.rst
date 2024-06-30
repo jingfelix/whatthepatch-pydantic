@@ -1,6 +1,8 @@
 What The Patch!?
 ================
 
+**Note that this is a fork of [whatthepatch](https://github.com/cscorley/whatthepatch) and aims to add pydantic support**
+
 What The Patch!? is a library for both parsing and applying patch files.
 
 Status

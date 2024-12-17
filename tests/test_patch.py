@@ -4,9 +4,9 @@ import os
 import time
 import unittest
 
-from src import whatthepatch as wtp
-from src.whatthepatch.patch import Change, Diff as diffobj
-from src.whatthepatch.patch import Header as headerobj
+from src import whatthepatch_pydantic as wtp
+from src.whatthepatch_pydantic.patch import Change, Diff as diffobj
+from src.whatthepatch_pydantic.patch import Header as headerobj
 
 module_path = os.path.dirname(__file__)
 

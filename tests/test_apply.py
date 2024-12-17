@@ -5,8 +5,8 @@ from unittest.case import SkipTest
 
 import pytest
 
-from src.whatthepatch import apply_diff, exceptions, parse_patch
-from src.whatthepatch.snippets import which
+from src.whatthepatch_pydantic import apply_diff, exceptions, parse_patch
+from src.whatthepatch_pydantic.snippets import which
 
 
 def _apply(src, diff_text, reverse=False, use_patch=False):
